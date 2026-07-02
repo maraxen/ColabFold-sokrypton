@@ -1,7 +1,10 @@
 """
 AlphaFold2 input featurization from MSAs and templates.
 """
+import functools
 import logging
+import os
+import shutil
 from typing import Any, Dict, List, Union
 
 import numpy as np
@@ -22,6 +25,22 @@ logger = logging.getLogger(__name__)
 
 # alphafold.data.templates shadows numpy's name local
 ndarray = np.ndarray
+
+
+@functools.lru_cache(maxsize=None)
+def _tool_path(name: str) -> str:
+    override = os.environ.get(f"COLABFOLD_{name.upper()}")
+    if override:
+        return override
+    found = shutil.which(name)
+    if found:
+        return found
+    try:
+        import colabfold_binaries
+
+        return colabfold_binaries.binary_path(name)
+    except Exception:
+        return name
 
 
 def mk_mock_template(
@@ -72,13 +91,13 @@ def mk_template(
         mmcif_dir=template_path,
         max_template_date=max_template_date,
         max_hits=max_hits,
-        kalign_binary_path="kalign",
+        kalign_binary_path=_tool_path("kalign"),
         release_dates_path=None,
         obsolete_pdbs_path=None,
     )
 
     hhsearch_pdb70_runner = hhsearch.HHSearch(
-        binary_path="hhsearch", databases=[f"{template_path}/pdb70"]
+        binary_path=_tool_path("hhsearch"), databases=[f"{template_path}/pdb70"]
     )
 
     hhsearch_result = hhsearch_pdb70_runner.query(a3m_lines)
